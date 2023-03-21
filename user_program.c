@@ -16,11 +16,12 @@ main(int argc, char *argv[])
 
     /*
     //base test program
-    */
+    
     printf(1,"Pid: %d\n", getpid());
     while(1);
     exit();
-   /*
+    */
+   
    int num;
    if (argc< 2)
    {
@@ -59,5 +60,4 @@ main(int argc, char *argv[])
    }
 
    exit();
-   */
 }

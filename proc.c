@@ -739,6 +739,7 @@ void removeProcessFromPriorityQueue(int priority, int indexInQueue)
 void resetPriority()
 {
    acquire(&ptable.lock);
+
    int i;
    int priIndex;
    for(i = 0; i < NPROC; i++)
@@ -795,6 +796,7 @@ int renice(int priority, int pid)
 		   ptable.priorityQueue[pIndex][i] = NULL;
 		   ptable.queueCount[pIndex]--;
 		}
+		release(&ptable.lock);
 		return 0;
 	    }
 	}
@@ -814,7 +816,7 @@ void proc_ps(void)
   for(p=ptable.proc; p< &ptable.proc[NPROC]; p++)
   {
     if(p->state != UNUSED){
-      //cprintf("name: %s", p->name);
+      cprintf("Name: %s, ", p->name);
       cprintf("PID: %d, ", p->pid);
       cprintf("State: %s, ", state_info[p->state]);
       cprintf("Priority: %d, ", p->priority);
@@ -823,5 +825,4 @@ void proc_ps(void)
   }
 
   release(&ptable.lock);
-  //return 0;
 }

@@ -59,10 +59,10 @@ trap(struct trapframe *tf)
       ticks++;
       
       // Edited by Eric Cordts and Jonathan Hsin for EECE7376
-      if(ticks % 20 == 0)
+      if(ticks % 10 == 0)
       {
 	// reset priority to highest priority for all processes
-	// every 200ms
+	// every 10 interrupt timer ticks
 	resetPriority();
       }
 
