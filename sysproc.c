@@ -111,3 +111,12 @@ int sys_renice(void)
   }
   return renice(priority, pid);
 }
+
+//ps
+int 
+sys_ps(void)
+{
+  //call proc_ps
+  proc_ps();
+  return 0;
+}

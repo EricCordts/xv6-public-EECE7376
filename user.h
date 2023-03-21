@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int renice(int, int); // parameters are int priority, int pid
+int ps(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

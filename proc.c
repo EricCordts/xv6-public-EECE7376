@@ -803,3 +803,25 @@ int renice(int priority, int pid)
    return -1;
 }
 
+//ps command
+void proc_ps(void)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+
+  const char* state_info[] = {"Unnused", "Embryo", "Sleeping","Runnable", "Running", "Zombie"};
+  for(p=ptable.proc; p< &ptable.proc[NPROC]; p++)
+  {
+    if(p->state != UNUSED){
+      //cprintf("name: %s", p->name);
+      cprintf("PID: %d, ", p->pid);
+      cprintf("State: %s, ", state_info[p->state]);
+      cprintf("Priority: %d, ", p->priority);
+      cprintf("Parent ID: %d\n", p->parent->pid);
+    }
+  }
+
+  release(&ptable.lock);
+  //return 0;
+}
