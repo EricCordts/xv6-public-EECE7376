@@ -27,6 +27,7 @@ extern void trapret(void);
 static void wakeup1(void *chan);
 
 void removeProcessFromPriorityQueue(int priority, int indexInQueue);
+int findIndexInPriorityQueue(int priority);
 
 void
 pinit(void)
@@ -117,6 +118,11 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  // Edited by Eric Cordts and Jonathan Hsin
+  p->priority = 1;
+  p->indexInQueue = findIndexInPriorityQueue(p->priority);
+  ptable.priorityQueue[1][p->indexInQueue] = p;
+  ptable.queueCount[1]++;
 
   release(&ptable.lock);
 
@@ -195,16 +201,7 @@ userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
-
-  // Edited by Jonathan Hsin and Eric Cordts
-  // Assign default priority of user process 
-  // to 1 and put it into appropriate queue
-  p->priority = 1;
-  p->indexInQueue = findIndexInPriorityQueue(p->priority);
-  ptable.priorityQueue[p->priority][p->indexInQueue] = p;
-  ptable.queueCount[p->priority]++;
   p->state = RUNNABLE;
-
   release(&ptable.lock);
 }
 
@@ -268,17 +265,7 @@ fork(void)
   pid = np->pid;
 
   acquire(&ptable.lock);
-
-  // Edited by Jonathan Hsin and Eric Cordt
-  // new process set to priority 1 and added to 
-  // appropriate queue
-  np->priority = 1;
-  np->indexInQueue = findIndexInPriorityQueue(np->priority);
-  ptable.priorityQueue[np->priority][np->indexInQueue] = np;
-  ptable.queueCount[np->priority]++;
-
   np->state = RUNNABLE;
-
   release(&ptable.lock);
 
   return pid;
@@ -399,6 +386,119 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+    // Edited by Eric Cordts and Jonathan Hsin for EECE7376
+    
+    // First check the top priority queue and run it RR
+    // until it is empty (queueCount == 0)
+    while(ptable.queueCount[0] > 0)
+    {
+	int runnableInQueue0 = 0;
+	int i;
+	for(i = 0; i < NPROC; i++)
+	{
+	    p = ptable.priorityQueue[0][i];
+	    if(p == NULL || p->state != RUNNABLE)
+	    {
+		continue;
+	    }
+	    // Switch to chosen process. It is the process' 
+	    // job to release ptable.lock and then reacquire it 
+	    // before jumping back to us.
+	    runnableInQueue0 = 1;
+	    c->proc = p;
+	    switchuvm(p);
+	    p->state = RUNNING;
+	    
+	    swtch(&c->scheduler, p->context);
+	    switchkvm();
+
+	    // Process is done running for now
+	    // It should have changed its p->state before coming back.
+	    c->proc = 0;
+	}
+	if(runnableInQueue0 == 0)
+	{
+	    break;
+	}
+    }
+    // Then check the middle priority queue 
+    // and run it RR until it is empty OR until 
+    // the queueCount of the top priority queue is no longer 0.
+    while(ptable.queueCount[0] == 0 && ptable.queueCount[1] > 0)
+    {
+	int runnableInQueue1 = 0;
+	int j;
+	for(j = 0; j < NPROC; j++)
+	{
+	    p = ptable.priorityQueue[1][j];
+	    if(p == NULL || p->state != RUNNABLE)
+	    {
+		continue;
+	    }
+	    runnableInQueue1 = 1;
+	    // Switch to chosen process. It is the process' job
+	    // to release ptable.lock and then reacquire it before
+	    // jumping back to us
+	    c->proc = p;
+	    switchuvm(p);
+	    p->state = RUNNING;
+
+	    swtch(&c->scheduler, p->context);
+	    switchkvm();
+	    // process is done running for now
+	    // It should have changed its p->state before coming back.
+	    c->proc = 0;
+
+	    // Check if the queueCount of Queue 0 has changed. If so, 
+	    // need to break out of the for loop.
+	    if(ptable.queueCount[0] > 0)
+	    {
+		break;
+	    }
+	}
+	if(runnableInQueue1 == 0)
+	{
+	    break;
+	}
+    }
+
+    // Now check the last priority queue and run it RR 
+    // until it is empty OR until the queueCount of 
+    // either the top or middle queue is no longer 0.
+    while(ptable.queueCount[0] == 0 && ptable.queueCount[1] == 0 && ptable.queueCount[2] > 0)
+    {
+	int runnableInQueue2 = 0;
+	int k;
+	for(k = 0; k < NPROC; k++)
+	{
+	    p = ptable.priorityQueue[2][k];
+	    if(p == NULL || p->state != RUNNABLE)
+	    {
+		continue;
+	    }
+	    runnableInQueue2 = 1;
+	    c->proc = p;
+	    switchuvm(p);
+	    p->state = RUNNING;
+	    swtch(&c->scheduler, p->context);
+	    switchkvm();
+	    c->proc = 0;
+
+	   // Check if the queueCount of Queue 0 or 1 have changed. If so, 
+	   // break out of the for loop
+	   if(ptable.queueCount[0] > 0 || ptable.queueCount[1] > 0)
+	   {
+		break;
+	   } 
+	}
+	if(runnableInQueue2 == 0)
+	{
+	   break;
+	}
+    }
+    /*
+    COMMENTED OUT RR Scheduler
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -412,11 +512,14 @@ scheduler(void)
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
-
+      cprintf("Name of proc: %s\n", p->name);
+      cprintf("Count of queue0: %d\n", ptable.queueCount[0]);
+      cprintf("Count of queue1: %d\n", ptable.queueCount[1]);
+      cprintf("Count of queue2: %d\n", ptable.queueCount[2]);
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-    }
+    }*/
     release(&ptable.lock);
 
   }
