@@ -764,3 +764,42 @@ void resetPriority()
    release(&ptable.lock);
 }
 
+// Added by Eric Cordts and Jonathan Hsin
+// Implementation of renice system call
+int renice(int priority, int pid)
+{
+   acquire(&ptable.lock);
+
+   struct proc* p;
+   int pIndex;
+   for(pIndex = 0; pIndex < 3; pIndex++)
+   {
+	int i;
+	for(i = 0; i < NPROC; i++)
+	{
+	    p = ptable.priorityQueue[pIndex][i];
+	    if(p != NULL && p->pid == pid)
+	    {
+		// only make changes if the 
+		// priority is different. Otherwise, its a 
+		// waste of time.
+		if(p->priority != priority)
+		{
+		   // Set priority and move to appropriate queue
+		   p->priority = priority;
+		   p->indexInQueue = findIndexInPriorityQueue(priority);
+		   ptable.priorityQueue[priority][p->indexInQueue] = p;
+		   ptable.queueCount[priority]++;
+
+		   // Remove process from previous queue
+		   ptable.priorityQueue[pIndex][i] = NULL;
+		   ptable.queueCount[pIndex]--;
+		}
+		return 0;
+	    }
+	}
+   }
+   release(&ptable.lock);
+   return -1;
+}
+

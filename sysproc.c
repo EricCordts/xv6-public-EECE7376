@@ -89,3 +89,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int sys_renice(void)
+{
+  int pid;
+  int priority;
+  // in linux, priority is first
+  // then PID
+  if(argint(0, &priority) < 0)
+  {
+     return -1;
+  } 
+  if(argint(1, &pid) < 0)
+  {
+     return -1;
+  }
+
+  if(priority < 0 || priority > 2)
+  {
+     return -1;
+  }
+  return renice(priority, pid);
+}
