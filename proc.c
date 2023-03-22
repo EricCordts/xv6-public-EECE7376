@@ -386,7 +386,6 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
     // Edited by Eric Cordts and Jonathan Hsin for EECE7376
     
     // First check the top priority queue and run it RR
@@ -739,6 +738,7 @@ void removeProcessFromPriorityQueue(int priority, int indexInQueue)
 void resetPriority()
 {
    acquire(&ptable.lock);
+
    int i;
    int priIndex;
    for(i = 0; i < NPROC; i++)
@@ -795,6 +795,7 @@ int renice(int priority, int pid)
 		   ptable.priorityQueue[pIndex][i] = NULL;
 		   ptable.queueCount[pIndex]--;
 		}
+		release(&ptable.lock);
 		return 0;
 	    }
 	}
@@ -803,3 +804,24 @@ int renice(int priority, int pid)
    return -1;
 }
 
+//ps command
+void proc_ps(void)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+
+  const char* state_info[] = {"Unnused", "Embryo", "Sleeping","Runnable", "Running", "Zombie"};
+  for(p=ptable.proc; p< &ptable.proc[NPROC]; p++)
+  {
+    if(p->state != UNUSED){
+      cprintf("Name: %s, ", p->name);
+      cprintf("PID: %d, ", p->pid);
+      cprintf("State: %s, ", state_info[p->state]);
+      cprintf("Priority: %d, ", p->priority);
+      cprintf("Parent ID: %d\n", p->parent->pid);
+    }
+  }
+
+  release(&ptable.lock);
+}
