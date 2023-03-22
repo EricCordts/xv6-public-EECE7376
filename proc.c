@@ -386,7 +386,6 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
     // Edited by Eric Cordts and Jonathan Hsin for EECE7376
     
     // First check the top priority queue and run it RR
