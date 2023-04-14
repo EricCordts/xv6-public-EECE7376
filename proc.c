@@ -15,7 +15,6 @@ struct {
   struct proc proc[NPROC];
   // Edited by Eric Cordts and Jonathan Hsin
   struct proc* priorityQueue[3][NPROC]; // Need 3 queues, 0 is highest priority, 2 is lowest
-  int queueCount[3];
 } ptable;
 
 static struct proc *initproc;
@@ -28,6 +27,7 @@ static void wakeup1(void *chan);
 
 void removeProcessFromPriorityQueue(int priority, int indexInQueue);
 int findIndexInPriorityQueue(int priority);
+int checkIfRunnable(int priority);
 
 void
 pinit(void)
@@ -47,9 +47,6 @@ pinit(void)
 		ptable.priorityQueue[i][j] = NULL;
 	}
   }
-  ptable.queueCount[0] = 0;
-  ptable.queueCount[1] = 0;
-  ptable.queueCount[2] = 0;
 
   release(&ptable.lock);
 }
@@ -122,7 +119,6 @@ found:
   p->priority = 1;
   p->indexInQueue = findIndexInPriorityQueue(p->priority);
   ptable.priorityQueue[1][p->indexInQueue] = p;
-  ptable.queueCount[1]++;
 
   release(&ptable.lock);
 
@@ -388,11 +384,10 @@ scheduler(void)
     acquire(&ptable.lock);
     // Edited by Eric Cordts and Jonathan Hsin for EECE7376
     
-    // First check the top priority queue and run it RR
-    // until it is empty (queueCount == 0)
-    while(ptable.queueCount[0] > 0)
+    // First check the top priority queue and run it 
+    // RR while there is still a runnable process in it
+    while(checkIfRunnable(0) == 1)
     {
-	int runnableInQueue0 = 0;
 	int i;
 	for(i = 0; i < NPROC; i++)
 	{
@@ -404,7 +399,6 @@ scheduler(void)
 	    // Switch to chosen process. It is the process' 
 	    // job to release ptable.lock and then reacquire it 
 	    // before jumping back to us.
-	    runnableInQueue0 = 1;
 	    c->proc = p;
 	    switchuvm(p);
 	    p->state = RUNNING;
@@ -416,17 +410,14 @@ scheduler(void)
 	    // It should have changed its p->state before coming back.
 	    c->proc = 0;
 	}
-	if(runnableInQueue0 == 0)
-	{
-	    break;
-	}
     }
     // Then check the middle priority queue 
-    // and run it RR until it is empty OR until 
-    // the queueCount of the top priority queue is no longer 0.
-    while(ptable.queueCount[0] == 0 && ptable.queueCount[1] > 0)
+    // and run it RR only if there are no runnable
+    // processes in queue 0 and if there are runnable processes
+    // in queue 1. Always check after returning to the scheduler 
+    // if there is a runnable process in queue 0.
+    while(checkIfRunnable(0) == 0 && checkIfRunnable(1) == 1)
     {
-	int runnableInQueue1 = 0;
 	int j;
 	for(j = 0; j < NPROC; j++)
 	{
@@ -435,7 +426,6 @@ scheduler(void)
 	    {
 		continue;
 	    }
-	    runnableInQueue1 = 1;
 	    // Switch to chosen process. It is the process' job
 	    // to release ptable.lock and then reacquire it before
 	    // jumping back to us
@@ -449,25 +439,20 @@ scheduler(void)
 	    // It should have changed its p->state before coming back.
 	    c->proc = 0;
 
-	    // Check if the queueCount of Queue 0 has changed. If so, 
+	    // Check if there is now a runnable process in Queue 0. If so, 
 	    // need to break out of the for loop.
-	    if(ptable.queueCount[0] > 0)
+	    if(checkIfRunnable(0) == 1)
 	    {
 		break;
 	    }
 	}
-	if(runnableInQueue1 == 0)
-	{
-	    break;
-	}
     }
 
     // Now check the last priority queue and run it RR 
-    // until it is empty OR until the queueCount of 
-    // either the top or middle queue is no longer 0.
-    while(ptable.queueCount[0] == 0 && ptable.queueCount[1] == 0 && ptable.queueCount[2] > 0)
+    // until it is empty OR until there is a runnable process in 
+    // either the top or middle queue.
+    while(checkIfRunnable(0) == 0 && checkIfRunnable(1) == 0 && checkIfRunnable(2) == 1)
     {
-	int runnableInQueue2 = 0;
 	int k;
 	for(k = 0; k < NPROC; k++)
 	{
@@ -476,7 +461,6 @@ scheduler(void)
 	    {
 		continue;
 	    }
-	    runnableInQueue2 = 1;
 	    c->proc = p;
 	    switchuvm(p);
 	    p->state = RUNNING;
@@ -484,16 +468,12 @@ scheduler(void)
 	    switchkvm();
 	    c->proc = 0;
 
-	   // Check if the queueCount of Queue 0 or 1 have changed. If so, 
+	   // Check if there are now runnable processes in queue 0 or queue 1. If so, 
 	   // break out of the for loop
-	   if(ptable.queueCount[0] > 0 || ptable.queueCount[1] > 0)
+	   if(checkIfRunnable(0) == 1 || checkIfRunnable(1) == 1)
 	   {
 		break;
 	   } 
-	}
-	if(runnableInQueue2 == 0)
-	{
-	   break;
 	}
     }
     /*
@@ -522,6 +502,28 @@ scheduler(void)
     release(&ptable.lock);
 
   }
+}
+// returns 0 if no processes in the specified priority 
+// queue are runnable. Returns 1 if there is at least 1 
+// process that is in the runnable state. 
+// Requires that the ptable lock has been
+// acquired.
+int checkIfRunnable(int priority)
+{
+  int runnable = 0;
+  int i;
+  for(i = 0; i < NPROC; i++)
+  {
+	if(ptable.priorityQueue[priority][i] != NULL)
+	{
+	   if(ptable.priorityQueue[priority][i]->state == RUNNABLE)
+	   {
+		runnable = 1;
+		break;
+	   }
+	}
+  }
+  return runnable;
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -575,11 +577,9 @@ void dropInPriority(void)
       // remove it from its current queue
       // and add it to the new queue. 
       ptable.priorityQueue[curproc->priority][curproc->indexInQueue] = NULL;
-      ptable.queueCount[curproc->priority]--;
       curproc->priority++;
       curproc->indexInQueue = findIndexInPriorityQueue(curproc->priority);
       ptable.priorityQueue[curproc->priority][curproc->indexInQueue] = curproc;
-      ptable.queueCount[curproc->priority]++;
   }
   // Otherwise, it is already at the lowest 
   // priority queue, so just leave it as is.
@@ -734,7 +734,6 @@ procdump(void)
 void removeProcessFromPriorityQueue(int priority, int indexInQueue)
 {
    ptable.priorityQueue[priority][indexInQueue] = NULL;
-   ptable.queueCount[priority]--;
 }
 
 // Added by Eric Cordts and Jonathan Hsin for EECE7376
@@ -758,11 +757,9 @@ void resetPriority()
           process->priority = 0;
 	  process->indexInQueue = findIndexInPriorityQueue(process->priority);
 	  ptable.priorityQueue[0][process->indexInQueue] = process;
-	  ptable.queueCount[0]++;
 
 	  // Remove process from priority 1/2 queue
 	  ptable.priorityQueue[priIndex][i] = NULL;
-	  ptable.queueCount[priIndex]--;
      	}
      }
    }
@@ -795,11 +792,9 @@ int renice(int priority, int pid)
 		   p->priority = priority;
 		   p->indexInQueue = findIndexInPriorityQueue(priority);
 		   ptable.priorityQueue[priority][p->indexInQueue] = p;
-		   ptable.queueCount[priority]++;
 
 		   // Remove process from previous queue
 		   ptable.priorityQueue[pIndex][i] = NULL;
-		   ptable.queueCount[pIndex]--;
 		}
 		release(&ptable.lock);
 		return 0;
