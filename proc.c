@@ -554,6 +554,15 @@ sched(void)
 void
 yield(void)
 {
+  acquire(&ptable.lock);  //DOC: yieldlock
+  myproc()->state = RUNNABLE;
+  sched();
+  release(&ptable.lock);
+}
+
+// Edited by Jonathan Hsin and Eric Cordts
+void dropInPriority(void)
+{
   struct proc* curproc = myproc();
   acquire(&ptable.lock);  //DOC: yieldlock
   // Edited by Jonathan Hsin and Eric Cordts
@@ -574,9 +583,6 @@ yield(void)
   }
   // Otherwise, it is already at the lowest 
   // priority queue, so just leave it as is.
-
-  curproc->state = RUNNABLE;
-  sched();
   release(&ptable.lock);
 }
 

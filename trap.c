@@ -14,8 +14,8 @@ extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 
-extern void resetPriority();
-
+extern void resetPriority(void);
+extern void dropInPriority(void);
 void
 tvinit(void)
 {
@@ -121,6 +121,7 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
   {
+    dropInPriority();
     yield();
   }
   // Check if the process has been killed since we yielded
