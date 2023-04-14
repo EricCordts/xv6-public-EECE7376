@@ -3,21 +3,20 @@
 #include "stat.h"
 #include "fcntl.h"
 
-/*
-https://www.geeksforgeeks.org/create-n-child-process-parent-process-using-fork-c/
-need to have a ps method to print out priority as well
-https://www.youtube.com/watch?v=hIXRrv-cBA4
-https://www.youtube.com/watch?v=DZ0-GMtOtEc
-allproc was modified to add default priority of 1 
-*/
 int
 main(int argc, char *argv[])
 {   
    int numChildren;
    if (argc < 2)
    {
-        numChildren = 1;
+        printf(0, "Error in usage, need a number of children processes to create (which must be a multiple of 3)\n");
+	exit();
    } 
+   else if(atoi(argv[1]) % 3 != 0)
+   {
+	printf(0, "Input needs to be a multiple of 3\n");
+	exit();
+   }
    else 
    {
         numChildren = atoi(argv[1]);
@@ -31,9 +30,13 @@ main(int argc, char *argv[])
    int printOutPriority = 0;
    for(y = getpid() + 1; y < getpid() + numChildren + 1; y++)
    {
-	if(count % 2 == 0)
+	if(count % 3 == 0)
 	{
 	    printOutPriority = 0;
+	}
+	else if(count % 3 == 1)
+	{
+	    printOutPriority = 1;
 	}
 	else
 	{
@@ -48,9 +51,13 @@ main(int argc, char *argv[])
    int priorityValue = 0;
    for (i = 0; i < numChildren; i++)
    {
-	if(i % 2 == 0)
+	if(i % 3 == 0)
 	{
 	   priorityValue = 0;
+	}
+	else if(i % 3 == 1)
+	{
+	   priorityValue = 1;
 	}
 	else
 	{
@@ -61,10 +68,8 @@ main(int argc, char *argv[])
         {
             printf(1, "fork error\n");
         } 
-        else if (child_ids[i]  == 0)
+        else if (child_ids[i] == 0)
         {
-            //printf(1, "Child Pid: %d\n", getpid());
-	    //printf(1, "Priority value: %d\n", priorityValue);
 	    // Sleep immediately after the child is created
 	    // to allow for other children to get created
             sleep(10);
@@ -76,15 +81,12 @@ main(int argc, char *argv[])
 		if(x % 10000 == 0)
 		{
 		    renice(priorityValue, getpid());
-		    //sleep(100);
 		}
 	    }
-	    // Use a really long for loop
+	    // Use a long for loop
             exit();
         } 
    }
-
-   //ps();
 
    // Only run by parent, waits for all children to exit.
    int pidFromWait;
@@ -92,7 +94,7 @@ main(int argc, char *argv[])
    for(j = 0; j < numChildren; j++)
    {
 	pidFromWait = wait();
-	printf(0, "Child exited %d\n", pidFromWait);
+	printf(0, "Child PID %d exited\n", pidFromWait);
    }
 
    exit();
